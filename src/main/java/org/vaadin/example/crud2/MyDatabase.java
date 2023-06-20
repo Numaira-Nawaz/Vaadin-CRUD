@@ -3,6 +3,7 @@ package org.vaadin.example.crud2;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class MyDatabase {
     //private static int id;
@@ -13,14 +14,40 @@ public class MyDatabase {
     private String city;
     private String country;
     private String time;
-
-    public MyDatabase(String name, String phone, String email, String street, String city, String country) {
+    private String id;
+    public MyDatabase(String name, String phone, String email, String street, String city, String country,String time) {
         this.name = name;
         this.phone = phone;
         this.email = email;
         this.street = street;
         this.city = city;
         this.country = country;
+        this.time = time;
+    }
+    public MyDatabase(String name, String phone, String email, String street, String city, String country,String time,String id) {
+        this.name = name;
+        this.phone = phone;
+        this.email = email;
+        this.street = street;
+        this.city = city;
+        this.country = country;
+        this.time = time;
+        this.id=id;
+    }
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getTime() {
+        return time;
+    }
+
+    public void setTime(String time) {
+        this.time = time;
     }
 
     public MyDatabase() {
@@ -78,6 +105,7 @@ public class MyDatabase {
     private static final String URL = "jdbc:mysql://localhost:3306/phonebook";
     private static final String USER = "root";
     private static final String PASSWORD = "l1nx@3!";
+
     public static List<MyDatabase> getItems() {
         List<MyDatabase> items = new ArrayList<>();
 
@@ -96,8 +124,10 @@ public class MyDatabase {
                 String street = resultSet.getString("street");
                 String city = resultSet.getString("city");
                 String country = resultSet.getString("country");
+                String time = resultSet.getString("time");
+                String id = resultSet.getString("id");
                 //int id = resultSet.getInt(1);
-                MyDatabase item = new MyDatabase(name, phone, email,street, city,country);
+                MyDatabase item = new MyDatabase(name, phone, email,street, city,country,time,id);
                 items.add(item);
             }
             // Close the result set, statement, and connection
@@ -111,49 +141,52 @@ public class MyDatabase {
         return items;
     }
     //contact name,phone,email,street,city,country
-    public static MyDatabase addContact(String name, String phone, String email, String street, String city, String country) {
-        PreparedStatement statement;
+    public MyDatabase addContact(String name, String phone, String email, String street, String city, String country,String time1) {
+            PreparedStatement statement;
+            try {
+                statement = getConnection().prepareStatement("INSERT INTO contacts (Name, phone_no, email, street, city, country, time) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                statement.setString(1, name);
+                statement.setString(2, phone);
+                statement.setString(3, email);
+                statement.setString(4, street);
+                statement.setString(5, city);
+                statement.setString(6, country);
+                statement.setString(7,time1);
+                //System.out.println(statement);
+                statement.executeUpdate();
 
-        try {
-            statement = getConnection().prepareStatement("INSERT INTO contacts (Name, phone_no, email, street, city, country, time) VALUES (?, ?, ?, ?, ?, ?, null)");
-            statement.setString(1,name);
-            statement.setString(2,phone);
-            statement.setString(3,email);
-            statement.setString(4,street);
-            statement.setString(5,city);
-            statement.setString(6,country);
-            System.out.println(statement);
-            statement.executeUpdate();
+                statement.close();
+                getConnection().close();
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
-            statement.close();
-            getConnection().close();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-        MyDatabase contact = new MyDatabase(name, phone, email, street, city, country);
+        MyDatabase contact = new MyDatabase(name, phone, email, street, city, country,time1);
         return contact;
     }
 
 //--------------------------------------------------EDIT - CONTACT ----------------------------------------//
-    public static MyDatabase editContact(int id,String name, String phone, String email, String street, String city, String country){
+    public MyDatabase editContact(String id,String name, String phone, String email, String street, String city, String country,String time){
+
         try {
             PreparedStatement statement = getConnection().prepareStatement("update contacts set name = ?, phone_no = ?, email = ?, " +
-                    "street = ?, city = ?, country = ?, Time = Now() where id = ?" );
+                    "street = ?, city = ?, country = ?, Time = ? where id = ?" );
             statement.setString(1,name);
             statement.setString(2,phone);
             statement.setString(3,email);
             statement.setString(4,street);
             statement.setString(5,city);
             statement.setString(6,country);
-            statement.setInt(7,id);
-            //System.out.println(statement);
+            statement.setString(7,time);
+            statement.setString(8,id);
+
             statement.executeUpdate();
             statement.close();
             getConnection().close();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        MyDatabase contact =new MyDatabase(name,phone,email,street,city,country);
+        MyDatabase contact =new MyDatabase(name,phone,email,street,city,country,time);
         return contact;
     }
     public int getId(String phone){
@@ -174,12 +207,12 @@ public class MyDatabase {
         }
         return id;
     }
-    public boolean deleteContact(String phone) {
+    public boolean deleteContact(String id) {
         PreparedStatement statement;
         boolean isDeleted;
         try {
-            statement = getConnection().prepareStatement("delete from contacts where phone_no= ?");
-            statement.setString(1,phone);
+            statement = getConnection().prepareStatement("delete from contacts where id= ?");
+            statement.setString(1,id);
            int rowsDeleted =  statement.executeUpdate();
             if (rowsDeleted > 0) {
                 isDeleted = true;
@@ -191,31 +224,32 @@ public class MyDatabase {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        //rs.close();                       // Close the ResultSet                  5
-        ;
+
         return isDeleted;
     }
 
-    public boolean isTimeNull(String phone){
-        boolean isTimeNull = true;
+    public String getTimeBYid(String id) {
         ResultSet rs;
+        String time = null;
         try {
-            PreparedStatement statement = getConnection().prepareStatement("Select Time from contacts where phone_no = ?");
-            statement.setString(1,phone);
-            rs = statement.executeQuery();        // Get the result table from the query  3
+            PreparedStatement statement = getConnection().prepareStatement("SELECT Time FROM contacts WHERE id = ?");
+            statement.setString(1, id);
+            rs = statement.executeQuery();
             while (rs.next()) {
-                time = rs.getString(1);
-
-                isTimeNull = false;
+                 time = rs.getString("Time");
+                /*SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                isTime = sdf.parse(timeStr);*/
             }
-            rs.close();                       // Close the ResultSet                  5
+            rs.close();
             statement.close();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        return isTimeNull;
+        return time;
     }
-    //------------------------------------------Connection with DB------------u----------------------------//
+
+
+    //------------------------------------------Connection with DB----------------------------------------//
     public static Connection getConnection() {
         Connection connection;
         try {

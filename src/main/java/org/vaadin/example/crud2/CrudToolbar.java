@@ -1,14 +1,16 @@
 package org.vaadin.example.crud2;
 
+import com.vaadin.componentfactory.enhancedcrud.BinderCrudEditor;
+import com.vaadin.componentfactory.enhancedcrud.Crud;
+import com.vaadin.componentfactory.enhancedcrud.CrudEditor;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.crud.BinderCrudEditor;
-import com.vaadin.flow.component.crud.Crud;
-import com.vaadin.flow.component.crud.CrudEditor;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -19,36 +21,36 @@ import com.vaadin.flow.data.validator.EmailValidator;
 import com.vaadin.flow.data.validator.StringLengthValidator;
 import com.vaadin.flow.router.Route;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.vaadin.example.crud2.MyDatabase.addContact;
-import static org.vaadin.example.crud2.MyDatabase.editContact;
 
 @Route("crud-toolbar")
 public class CrudToolbar extends VerticalLayout {
-
     private final Crud<MyDatabase> crud;
     private ContactDataProvider dataProvider;
-    private final String EDIT_COLUMN = "vaadin-crud-edit-column";
+    private final String EDIT_COLUMN = "vcf-crud-edit-column";
     TextField name = new TextField("Name");
     TextField phoneNo = new TextField("Phone Number");
     TextField email = new TextField("Email");
     TextField street = new TextField("Street");
     TextField city = new TextField("City");
     TextField country = new TextField("County");
+    TextField time = new TextField("Time");
+    TextField id = new TextField("id");
     Button button = new Button("New Contact", VaadinIcon.PLUS.create());
 
-    FormLayout form = new FormLayout(name, phoneNo, email, street, city, country);
+    FormLayout form = new FormLayout(id,name, phoneNo, email, street, city, country,time);
     Span footer = new Span();
     boolean editMode = false;
+    boolean save = false;
 
     public CrudToolbar() {
-        crud = new Crud<>(
-                MyDatabase.class,
-                createEditor()
-        );
+        crud = new Crud<>(MyDatabase.class,createEditor());
+        time.setVisible(false);
+        id.setVisible(false);
         setupGrid();
         setupDataProvider();
         setupToolbar();
@@ -59,39 +61,34 @@ public class CrudToolbar extends VerticalLayout {
 
     private void setupGrid() {
         Grid<MyDatabase> grid = crud.getGrid();
-        grid.setSizeFull();
-       /* List<GridSortOrder<MyDatabase>> sortOrder = Collections.singletonList(new GridSortOrder<>(grid.getColumnByKey("name"),
-                SortDirection.ASCENDING));
-        grid.sort(sortOrder);*/
-        //editMode = true;
-        grid.addItemDoubleClickListener(event -> crud.edit(event.getItem(),
-                Crud.EditMode.EXISTING_ITEM));
-
-        grid.setColumnOrder(
-                grid.getColumnByKey(EDIT_COLUMN),
-                //grid.getColumnByKey("id"),
+        grid.setColumnOrder( grid.getColumnByKey(EDIT_COLUMN),
                 grid.getColumnByKey("name"),
                 grid.getColumnByKey("email"),
                 grid.getColumnByKey("phone"),
                 grid.getColumnByKey("street"),
                 grid.getColumnByKey("city"),
-                grid.getColumnByKey("country")
-
-        );
-
+                grid.getColumnByKey("country"),
+                grid.getColumnByKey("time"),
+                grid.getColumnByKey("id")
+                );
         // Only show these columns (all columns shown by default):
-      List<String> visibleColumns = Arrays.asList(
+     List<String> visibleColumns = Arrays.asList(
                 "name",
                 "email",
                 "phone",
+                "street",
+                "City",
+                "country",
                 EDIT_COLUMN
         );
+
         grid.getColumns().forEach(column -> {
             String key = column.getKey();
             if (!visibleColumns.contains(key)) {
-                grid.removeColumn(column);
+             grid.removeColumnByKey(key);
             }
         });
+
     }
 
     private void setupToolbar() {
@@ -128,10 +125,14 @@ public class CrudToolbar extends VerticalLayout {
         }
         return isExist;
     }
+
     private CrudEditor<MyDatabase> createEditor() {
+
         Binder<MyDatabase> binder = new Binder<>(MyDatabase.class);
-        binder.forField(name).asRequired().bind(MyDatabase::getName, MyDatabase::setName);
-        //binder.forField(phoneNo).asRequired().bind(MyDatabase::getPhone,MyDatabase::setPhone);
+        binder.forField(id)
+                .bind(MyDatabase::getId, MyDatabase::setId);
+
+        binder.forField(time).bind(MyDatabase::getTime,MyDatabase::setTime);
         binder.forField(phoneNo)
                 .asRequired()
                 .withValidator(new StringLengthValidator(
@@ -143,20 +144,15 @@ public class CrudToolbar extends VerticalLayout {
                         if (items.get(i).getPhone() == phoneNumber){
                            return ValidationResult.ok();
                         }
-
                     }
-                    for (MyDatabase item : items) {
-                        if (item.getPhone().equals(phoneNo.getValue())) {
+
+                        if (isExist(phoneNo.getValue())) {
                             return ValidationResult.error("Phone number already exists");
-                        }
-                    }
-
+                         }
                     return ValidationResult.ok();
                 })
                 .bind(MyDatabase::getPhone, MyDatabase::setPhone);
-
-
-        // Validation for email field
+        //Validation for email field
             binder.forField(email)
                     .asRequired()
                     .withValidator(new EmailValidator("Invalid email address"))
@@ -167,35 +163,118 @@ public class CrudToolbar extends VerticalLayout {
             binder.forField(country).bind(MyDatabase::getCountry, MyDatabase::setCountry);
             return new BinderCrudEditor<>(binder, form);
     }
-
+    private void confirmationBox(){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setConfirmButton("confirm",e->{
+            save = true;
+        });
+    }
     private void setupDataProvider() {
         dataProvider = new ContactDataProvider();
         crud.setDataProvider(dataProvider);
         MyDatabase database = new MyDatabase();
-
+        final String[] bUpdatePh = {phoneNo.getValue()};
+        //ConfirmDialog dialog = new ConfirmDialog();
+        //AtomicBoolean save = new AtomicBoolean(false);
+        //--------------------------------------------Delete - Listener -------------------------------------------------------//
         crud.addDeleteListener(deleteEvent ->{
-            if (database.deleteContact(phoneNo.getValue())){
+            if (database.deleteContact(id.getValue()))
+            {
                 dataProvider.delete(deleteEvent.getItem());
+                editMode = false;
             }
         });
-        final String[] bUpdatePh = {phoneNo.getValue()};
+
+        //--------------------------------------------Pre - Save - Listener -------------------------------------------------------//
+      /*  crud.addPreSaveListener(e ->
+        confirmationBox());
+*/
+        ConfirmDialog dialog = new ConfirmDialog();
+        //--------------------------------------------Save - Listener --------------------------------------------------------//
         crud.addSaveListener(saveEvent -> {
-            if (editMode) {
-                int id = database.getId(bUpdatePh[0]);
-                editContact(id,name.getValue(), phoneNo.getValue(), email.getValue(),street.getValue() ,city.getValue() ,country.getValue());
-            }else {
+            DateFormat date_format_obj = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date date_obj = new Date();
+            String time1 = date_format_obj.format(date_obj);
+           if(editMode){
+               //
+               //int id = database.getId(bUpdatePh[0]);
+               if (database.getTimeBYid(id.getValue()).equals(time.getValue())) {
+                   database.editContact(id.getValue(), name.getValue(), phoneNo.getValue(), email.getValue(), street.getValue(), city.getValue(), country.getValue(), time1);
+               } else{
+                   dialog.open();
+                   /*
+                   dialog.setText("You have updated the contact. Do you want to update the contact again?");
+
+                 dialog.setConfirmButton("YES", event -> {
+                       save = true;
+                       database.editContact(id, name.getValue(), phoneNo.getValue(), email.getValue(), street.getValue(), city.getValue(), country.getValue(), time1);
+
+                       // save the changes
+                       dialog.close();
+
+                   });
+                   dialog.setRejectButton("Discard", event -> {
+                       crud.cancelSave();
+                       save = false;
+                       form.setVisible(true);
+                       dialog.close();
+                   });
+                   dialog.setCancelButton("Cancel", event -> {
+                       save = false;
+                       dialog.close();
+                   });
+
+                    dialog.open();*/
+                 if (save) {
+                       database.editContact(id.getValue(), name.getValue(), phoneNo.getValue(), email.getValue(), street.getValue(), city.getValue(), country.getValue(), time1);
+                   }else {
+                       Notification.show("Second EDIT");
+                   }
+               }
+           }else{
 
                 dataProvider.persist(saveEvent.getItem());
-                addContact(name.getValue(), phoneNo.getValue(), email.getValue(), street.getValue(), city.getValue(), country.getValue());
-
-                dataProvider.refreshAll();
+                database.addContact(name.getValue(), phoneNo.getValue(), email.getValue(), street.getValue(), city.getValue(), country.getValue(),time1);
             }
+            saveEvent.getItem().setTime(time1);
             editMode = false;
         });
 
+        //--------------------------------------------add - Pre - Save - Listener--------------------------------------------//
+
+          crud.addPreSaveListener(e -> {
+                //int id = database.getId(bUpdatePh[0]);
+                  if (editMode && !database.getTimeBYid(id.getValue()).equals(time.getValue())) {
+                        // show a confirmation dialog
+                      dialog.setText("You have updated the contact. Do you want to update the contact again?");
+                      //dialog.open();
+                      dialog.setConfirmButton("YES", event -> {
+                          save = true;
+                          // save the changes
+                          dialog.close();
+
+                      });
+                      /*dialog.setRejectButton("Discard", event -> {
+                            crud.cancelSave();
+                            save = false;
+                            //form.setVisible(true);
+                            dialog.close();
+                        });
+                        dialog.setCancelButton("Cancel", event -> {
+                            save = false;
+                            dialog.close();
+                        });*/
+
+                    }
+
+            });
+
+
+      //----------------------------------------------EDIT - LISTENER-------------------------------------------------------//
       crud.addEditListener(editEvent-> {
           editMode=true;
           bUpdatePh[0] = phoneNo.getValue();
+
             phoneNo.setPreventInvalidInput(true); // disable client-side validation
             phoneNo.addValueChangeListener(event -> {
 

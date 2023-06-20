@@ -1,7 +1,8 @@
 package org.vaadin.example.crud2;
 
 
-import com.vaadin.flow.component.crud.CrudFilter;
+
+import com.vaadin.componentfactory.enhancedcrud.CrudFilter;
 import com.vaadin.flow.data.provider.AbstractBackEndDataProvider;
 import com.vaadin.flow.data.provider.Query;
 import com.vaadin.flow.data.provider.SortDirection;
@@ -81,7 +82,7 @@ public class ContactDataProvider extends AbstractBackEndDataProvider<MyDatabase,
                                 (Comparable) valueOf(sortClause.getKey(), contact)
                         );
 
-                        if (sortClause.getValue() == SortDirection.DESCENDING) {
+                        if (sortClause.getValue() == SortDirection.ASCENDING) {
                             comparator = comparator.reversed();
                         }
 
@@ -115,9 +116,7 @@ public class ContactDataProvider extends AbstractBackEndDataProvider<MyDatabase,
         }
 
         final Optional<MyDatabase> existingItem = find(item.getPhone());
-        CrudToolbar crudToolbar = new CrudToolbar();
-        System.out.println("CRUSDD"+crudToolbar.phoneNo.getValue());
-          if (existingItem.isPresent()) {
+        if (existingItem.isPresent()) {
                 int position = DATABASE.indexOf(existingItem.get());
                 DATABASE.remove(existingItem.get());
                 DATABASE.add(position, item);
@@ -138,7 +137,7 @@ public class ContactDataProvider extends AbstractBackEndDataProvider<MyDatabase,
     }
 
     void delete(MyDatabase item) {
-        DATABASE.removeIf(entity -> entity.getPhone().equals(item.getPhone()));
+        DATABASE.removeIf(entity -> entity.getId().equals(item.getId()));
     }
 
 
